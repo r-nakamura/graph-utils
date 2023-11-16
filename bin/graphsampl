@@ -86,8 +86,6 @@ def main():
     Gs: graph_tools.Graph = None
     if opts.t == 'RN':
         Gs = RN_sampling(G, p)
-    elif opts.t == 'RE':
-        Gs = RE_sampling(G, p)
     elif opts.t == 'RW':
         Gs = RW_sampling(G, p)
     elif opts.t == 'RJ':
