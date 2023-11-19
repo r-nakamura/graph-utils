@@ -9,11 +9,56 @@ import graph_tools
 import randwalk
 
 def RN_sampling(G: graph_tools.Graph, p: float) -> graph_tools.Graph:
-    V = list(G.vertices())
-    random.shuffle(V)
-    nsample = int(len(V) * p)
-    Vs = V[:nsample]
+    V = sorted(G.vertices())
+    weights = [1. for v in V]
+    Vs = node_sampling(V, weights, p)    
     return compose_subgraph(G, Vs)
+
+def RDN_sampling(G: graph_tools.Graph, p: float) -> graph_tools.Graph:
+    """J. Leskovec and C. Faloutsos, ``Sampling from large graphs,''
+    Proceedings of the 12th ACM International Conference on Knowledge
+    Discovery and Data Mining (SIGKDD 2006), pp. 631–636, Aug. 2006."""
+    V = sorted(G.vertices())
+    degrees = [G.degree(v) for v in V]
+    Vs = node_sampling(V, degrees, p)
+    return compose_subgraph(G, Vs)    
+
+def RPN_sampling(G: graph_tools.Graph, p: float) -> graph_tools.Graph:
+    """J. Leskovec and C. Faloutsos, ``Sampling from large graphs,''
+    Proceedings of the 12th ACM International Conference on Knowledge
+    Discovery and Data Mining (SIGKDD 2006), pp. 631–636, Aug. 2006."""    
+    V = sorted(G.vertices())
+    pagerank = pagerank_centralities(G)
+    pageranks = [pagerank[v] for v in V]
+    Vs = node_sampling(V, pageranks, p)
+    return compose_subgraph(G, Vs)
+
+def pagerank_centralities(G: graph_tools.Graph, d:float=0.85, max_iter:int=100) -> dict[int:float]:
+    g = graph_tools.Graph(directed=True)
+    if G.is_undirected():
+        for u, v in G.unique_edges():
+            g.add_edge(u, v)
+            g.add_edge(v, u)
+    else:
+        g = G
+    N = g.nvertices()
+    pagerank = {v: {0 : 1 / N} for v in g.vertices()}
+    for t in range(1, max_iter + 1):
+        for v in g.vertices():
+            pagerank[v][t] = (1 - d) / N + d * sum([pagerank[u][t - 1] / g.out_degree(u) for u in g.predecessors(v)])
+    return {v: pagerank[v][max_iter] for v in g.vertices()}
+
+def node_sampling(V: [int], weights: [float], p: float) -> [int]:
+    nvertices = len(V)
+    adict = {v: w for v, w in zip(V, weights)}
+    Vs = []
+    for _ in range(int(nvertices * p)):
+        V = list(adict.keys())
+        weights = [adict[v] for v in V]
+        v = random.choices(V, weights=weights, k=1)[0]
+        Vs.append(v)
+        del adict[v]
+    return Vs
 
 def RW_sampling(G: graph_tools.Graph, p: float, c:float = 0.15) -> graph_tools.Graph:
     s = G.random_vertex()
@@ -86,6 +131,10 @@ def main():
     Gs: graph_tools.Graph = None
     if opts.t == 'RN':
         Gs = RN_sampling(G, p)
+    if opts.t == 'RDN':
+        Gs = RDN_sampling(G, p)
+    if opts.t == 'RPN':
+        Gs = RPN_sampling(G, p)                
     elif opts.t == 'RW':
         Gs = RW_sampling(G, p)
     elif opts.t == 'RJ':
